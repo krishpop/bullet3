@@ -571,7 +571,7 @@ class MinitaurGymEnv(gym.Env):
     self.control_time_step = control_step
     self._time_step = simulation_step
     self._action_repeat = int(round(control_step / simulation_step))
-    self._num_bullet_solver_iterations = (NUM_SIMULATION_ITERATION_STEPS / self._action_repeat)
+    self._num_bullet_solver_iterations = int(NUM_SIMULATION_ITERATION_STEPS / self._action_repeat)
     self._pybullet_client.setPhysicsEngineParameter(
         numSolverIterations=self._num_bullet_solver_iterations)
     self._pybullet_client.setTimeStep(self._time_step)

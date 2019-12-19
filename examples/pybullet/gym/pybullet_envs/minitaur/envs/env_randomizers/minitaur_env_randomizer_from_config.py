@@ -43,7 +43,7 @@ class MinitaurEnvRandomizerFromConfig(env_randomizer_base.EnvRandomizerBase):
       env: A minitaur gym environment.
     """
     self._randomization_function_dict = self._build_randomization_function_dict(env)
-    for param_name, random_range in self._randomization_param_dict.iteritems():
+    for param_name, random_range in self._randomization_param_dict.items():
       self._randomization_function_dict[param_name](lower_bound=random_range[0],
                                                     upper_bound=random_range[1])
 

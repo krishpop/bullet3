@@ -18,7 +18,15 @@ PARAM_RANGE = {
     "joint friction": [0, 0.05],  # Coulomb friction torque (Nm).
 }
 
+LAT_FRICTION_RANGE = {
+    "lateral friction": [0.5, 1.25]
+}
+
 
 def all_params():
   """Randomize all the physical parameters."""
   return PARAM_RANGE
+
+
+def lat_params():
+  return LAT_FRICTION_RANGE
