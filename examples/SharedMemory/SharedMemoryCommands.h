@@ -483,6 +483,8 @@ enum EnumSimParamUpdateFlags
 	SIM_PARAM_CONSTRAINT_MIN_SOLVER_ISLAND_SIZE = 1 << 25,
 	SIM_PARAM_REPORT_CONSTRAINT_SOLVER_ANALYTICS = 1 << 26,
 	SIM_PARAM_UPDATE_WARM_STARTING_FACTOR = 1 << 27,
+	SIM_PARAM_UPDATE_ARTICULATED_WARM_STARTING_FACTOR = 1 << 28,
+	SIM_PARAM_UPDATE_SPARSE_SDF = 1 << 29,
         
 };
 
@@ -501,6 +503,9 @@ enum EnumLoadSoftBodyUpdateFlags
         LOAD_SOFT_BODY_SET_FRICTION_COEFFICIENT = 1<<10,
         LOAD_SOFT_BODY_ADD_BENDING_SPRINGS = 1<<11,
         LOAD_SOFT_BODY_ADD_NEOHOOKEAN_FORCE = 1<<12,
+        LOAD_SOFT_BODY_USE_SELF_COLLISION = 1<<13,
+    LOAD_SOFT_BODY_USE_FACE_CONTACT = 1<<14,
+    LOAD_SOFT_BODY_SIM_MESH = 1<<15,
 };
 
 enum EnumSimParamInternalSimFlags
@@ -518,16 +523,21 @@ struct LoadSoftBodyArgs
 	double m_mass;
 	double m_collisionMargin;
 	double m_initialPosition[3];
-        double m_initialOrientation[4];
-        double m_springElasticStiffness;
-        double m_springDampingStiffness;
-        double m_corotatedMu;
-        double m_corotatedLambda;
-        bool m_useBendingSprings;
-        double m_collisionHardness;
-        double m_frictionCoeff;
-        double m_NeoHookeanMu;
-        double m_NeoHookeanLambda;
+    double m_initialOrientation[4];
+    double m_springElasticStiffness;
+    double m_springDampingStiffness;
+    double m_springBendingStiffness;
+    double m_corotatedMu;
+    double m_corotatedLambda;
+    int m_useBendingSprings;
+    double m_collisionHardness;
+    double m_useSelfCollision;
+    double m_frictionCoeff;
+    double m_NeoHookeanMu;
+    double m_NeoHookeanLambda;
+    double m_NeoHookeanDamping;
+    int m_useFaceContact;
+    char m_simFileName[MAX_FILENAME_LENGTH];
 };
 
 struct b3LoadSoftBodyResultArgs
@@ -793,6 +803,7 @@ enum EnumUserConstraintFlags
 	USER_CONSTRAINT_CHANGE_RELATIVE_POSITION_TARGET = 512,
 	USER_CONSTRAINT_CHANGE_ERP = 1024,
 	USER_CONSTRAINT_REQUEST_STATE = 2048,
+	USER_CONSTRAINT_ADD_SOFT_BODY_ANCHOR = 4096,
 };
 
 enum EnumBodyChangeFlags

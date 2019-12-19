@@ -70,16 +70,19 @@ public:
     virtual void renderScene()
     {
         CommonRigidBodyBase::renderScene();
-        btDeformableMultiBodyDynamicsWorld* deformableWorld = getDeformableDynamicsWorld();
+        
+		
+		btDeformableMultiBodyDynamicsWorld* deformableWorld = getDeformableDynamicsWorld();
         
         for (int i = 0; i < deformableWorld->getSoftBodyArray().size(); i++)
         {
             btSoftBody* psb = (btSoftBody*)deformableWorld->getSoftBodyArray()[i];
             {
-                btSoftBodyHelpers::DrawFrame(psb, deformableWorld->getDebugDrawer());
-                btSoftBodyHelpers::Draw(psb, deformableWorld->getDebugDrawer(), deformableWorld->getDrawFlags());
+                //btSoftBodyHelpers::DrawFrame(psb, deformableWorld->getDebugDrawer());
+				btSoftBodyHelpers::Draw(psb, deformableWorld->getDebugDrawer(), fDrawFlags::Faces);// StddeformableWorld->getDrawFlags());
             }
         }
+		
     }
 };
 
@@ -105,7 +108,8 @@ void DeformableContact::initPhysics()
     btVector3 gravity = btVector3(0, -10, 0);
     m_dynamicsWorld->setGravity(gravity);
     getDeformableDynamicsWorld()->getWorldInfo().m_gravity = gravity;
-    
+    getDeformableDynamicsWorld()->getWorldInfo().m_sparsesdf.setDefaultVoxelsz(0.25);
+		getDeformableDynamicsWorld()->getWorldInfo().m_sparsesdf.Reset();
     m_guiHelper->createPhysicsDebugDrawer(m_dynamicsWorld);
     
     {
@@ -182,7 +186,7 @@ void DeformableContact::initPhysics()
         psb2->setTotalMass(1);
         psb2->m_cfg.kKHR = 1; // collision hardness with kinematic objects
         psb2->m_cfg.kCHR = 1; // collision hardness with rigid body
-        psb2->m_cfg.kDF = 0.1;
+        psb2->m_cfg.kDF = 0.5;
         psb2->m_cfg.collisions = btSoftBody::fCollision::SDF_RD;
         psb2->m_cfg.collisions |= btSoftBody::fCollision::VF_DD;
         psb->translate(btVector3(3.5,0,0));
@@ -196,9 +200,17 @@ void DeformableContact::initPhysics()
         getDeformableDynamicsWorld()->addForce(psb2, gravity_force2);
         m_forces.push_back(gravity_force2);
     }
-    getDeformableDynamicsWorld()->setImplicit(true);
+    getDeformableDynamicsWorld()->setImplicit(false);
     getDeformableDynamicsWorld()->setLineSearch(false);
     m_guiHelper->autogenerateGraphicsObjects(m_dynamicsWorld);
+	int numInstances = m_guiHelper->getRenderInterface()->getTotalNumInstances();
+	double rgbaColors[3][4] = { { 1, 0, 0, 1 } , { 0, 1, 0, 1 } ,{ 0, 0, 1, 1 } };
+
+	for (int i = 0; i < numInstances; i++)
+	{
+		m_guiHelper->changeInstanceFlags(i, B3_INSTANCE_DOUBLE_SIDED);
+	}
+	
 }
 
 void DeformableContact::exitPhysics()

@@ -32,6 +32,14 @@ btScalar btDeformableContactProjection::update()
         }
     }
     
+    // anchor constraints
+    for (int index = 0; index < m_nodeAnchorConstraints.size(); ++index)
+    {
+        btDeformableNodeAnchorConstraint& constraint = *m_nodeAnchorConstraints.getAtIndex(index);
+        btScalar localResidualSquare = constraint.solveConstraint();
+        residualSquare = btMax(residualSquare, localResidualSquare);
+    }
+    
     // face constraints
     for (int index = 0; index < m_allFaceConstraints.size(); ++index)
     {
@@ -43,6 +51,57 @@ btScalar btDeformableContactProjection::update()
     return residualSquare;
 }
 
+void btDeformableContactProjection::splitImpulseSetup(const btContactSolverInfo& infoGlobal)
+{
+    // node constraints
+    for (int index = 0; index < m_nodeRigidConstraints.size(); ++index)
+    {
+        btAlignedObjectArray<btDeformableNodeRigidContactConstraint>& constraints = *m_nodeRigidConstraints.getAtIndex(index);
+        for (int i = 0; i < constraints.size(); ++i)
+        {
+            constraints[i].setPenetrationScale(infoGlobal.m_deformable_erp);
+        }
+    }
+    
+    // face constraints
+    for (int index = 0; index < m_allFaceConstraints.size(); ++index)
+    {
+        btDeformableContactConstraint* constraint = m_allFaceConstraints[index];
+        constraint->setPenetrationScale(infoGlobal.m_deformable_erp);
+    }
+}
+
+btScalar btDeformableContactProjection::solveSplitImpulse(const btContactSolverInfo& infoGlobal)
+{
+    btScalar residualSquare = 0;
+    // node constraints
+    for (int index = 0; index < m_nodeRigidConstraints.size(); ++index)
+    {
+        btAlignedObjectArray<btDeformableNodeRigidContactConstraint>& constraints = *m_nodeRigidConstraints.getAtIndex(index);
+        for (int i = 0; i < constraints.size(); ++i)
+        {
+            btScalar localResidualSquare = constraints[i].solveSplitImpulse(infoGlobal);
+            residualSquare = btMax(residualSquare, localResidualSquare);
+        }
+    }
+    
+    // anchor constraints
+    for (int index = 0; index < m_nodeAnchorConstraints.size(); ++index)
+    {
+        btDeformableNodeAnchorConstraint& constraint = *m_nodeAnchorConstraints.getAtIndex(index);
+        btScalar localResidualSquare = constraint.solveSplitImpulse(infoGlobal);
+        residualSquare = btMax(residualSquare, localResidualSquare);
+    }
+    
+    // face constraints
+    for (int index = 0; index < m_allFaceConstraints.size(); ++index)
+    {
+        btDeformableContactConstraint* constraint = m_allFaceConstraints[index];
+        btScalar localResidualSquare = constraint->solveSplitImpulse(infoGlobal);
+        residualSquare = btMax(residualSquare, localResidualSquare);
+    }
+    return residualSquare;
+}
 
 void btDeformableContactProjection::setConstraints()
 {
@@ -51,6 +110,10 @@ void btDeformableContactProjection::setConstraints()
     for (int i = 0; i < m_softBodies.size(); ++i)
     {
         btSoftBody* psb = m_softBodies[i];
+        if (!psb->isActive())
+        {
+            continue;
+        }
         for (int j = 0; j < psb->m_nodes.size(); ++j)
         {
             if (psb->m_nodes[j].m_im == 0)
@@ -61,10 +124,33 @@ void btDeformableContactProjection::setConstraints()
         }
     }
     
-    // set Deformable Node vs. Rigid constraint
     for (int i = 0; i < m_softBodies.size(); ++i)
     {
         btSoftBody* psb = m_softBodies[i];
+        if (!psb->isActive())
+        {
+            continue;
+        }
+
+        // set up deformable anchors
+        for (int j = 0; j < psb->m_deformableAnchors.size(); ++j)
+        {
+            btSoftBody::DeformableNodeRigidAnchor& anchor = psb->m_deformableAnchors[j];
+            // skip fixed points
+            if (anchor.m_node->m_im == 0)
+            {
+                continue;
+            }
+            
+            if (m_nodeAnchorConstraints.find(anchor.m_node->index) == NULL)
+            {
+                anchor.m_c1 = anchor.m_cti.m_colObj->getWorldTransform().getBasis() * anchor.m_local;
+                btDeformableNodeAnchorConstraint constraint(anchor);
+                m_nodeAnchorConstraints.insert(anchor.m_node->index, constraint);
+            }
+        }
+        
+        // set Deformable Node vs. Rigid constraint
         for (int j = 0; j < psb->m_nodeRigidContacts.size(); ++j)
         {
             const btSoftBody::DeformableNodeRigidContact& contact = psb->m_nodeRigidContacts[j];
@@ -242,6 +328,10 @@ void btDeformableContactProjection::setProjection()
     for (int i = 0; i < m_softBodies.size(); ++i)
     {
         btSoftBody* psb = m_softBodies[i];
+        if (!psb->isActive())
+        {
+            continue;
+        }
         for (int j = 0; j < psb->m_nodes.size(); ++j)
         {
             int index = psb->m_nodes[j].index;
@@ -249,7 +339,7 @@ void btDeformableContactProjection::setProjection()
             bool existStaticConstraint = false;
             btVector3 averagedNormal(0,0,0);
             btAlignedObjectArray<btVector3> normals;
-            if (m_staticConstraints.find(index) != NULL)
+            if (m_staticConstraints.find(index) != NULL || m_nodeAnchorConstraints.find(index) != NULL)
             {
                 existStaticConstraint = true;
                 hasConstraint = true;
@@ -438,6 +528,7 @@ void btDeformableContactProjection::applyDynamicFriction(TVStack& f)
 void btDeformableContactProjection::reinitialize(bool nodeUpdated)
 {
     m_staticConstraints.clear();
+    m_nodeAnchorConstraints.clear();
     m_nodeRigidConstraints.clear();
     m_faceRigidConstraints.clear();
     m_deformableConstraints.clear();

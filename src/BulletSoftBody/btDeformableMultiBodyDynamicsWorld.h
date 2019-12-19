@@ -62,6 +62,10 @@ protected:
     
     void solveConstraints(btScalar timeStep);
     
+    void updateActivationState(btScalar timeStep);
+    
+    void clearGravity();
+    
 public:
     btDeformableMultiBodyDynamicsWorld(btDispatcher* dispatcher, btBroadphaseInterface* pairCache, btDeformableMultiBodyConstraintSolver* constraintSolver, btCollisionConfiguration* collisionConfiguration, btDeformableBodySolver* deformableBodySolver = 0)
     : btMultiBodyDynamicsWorld(dispatcher, pairCache, (btMultiBodyConstraintSolver*)constraintSolver, collisionConfiguration),
@@ -83,9 +87,14 @@ public:
         m_sbi.water_normal = btVector3(0, 0, 0);
         m_sbi.m_gravity.setValue(0, -10, 0);
         m_internalTime = 0.0;
-        m_implicit = true;
+        m_implicit = false;
+        m_lineSearch = false;
         m_selfCollision = true;
     }
+
+    virtual int stepSimulation(btScalar timeStep, int maxSubSteps = 1, btScalar fixedTimeStep = btScalar(1.) / btScalar(60.));
+
+	virtual void debugDrawWorld();
 
     void setSolverCallback(btSolverCallback cb)
     {
@@ -147,6 +156,8 @@ public:
     
     void removeSoftBody(btSoftBody* body);
     
+    void removeCollisionObject(btCollisionObject* collisionObject);
+    
     int getDrawFlags() const { return (m_drawFlags); }
     void setDrawFlags(int f) { m_drawFlags = f; }
     
@@ -169,6 +180,7 @@ public:
     {
         m_lineSearch = lineSearch;
     }
+
 };
 
 #endif  //BT_DEFORMABLE_MULTIBODY_DYNAMICS_WORLD_H

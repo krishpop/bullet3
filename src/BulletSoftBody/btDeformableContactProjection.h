@@ -36,6 +36,8 @@ public:
     btHashMap<btHashInt, btAlignedObjectArray<btDeformableFaceRigidContactConstraint*> > m_faceRigidConstraints;
     // map from node index to deformable constraint
     btHashMap<btHashInt, btAlignedObjectArray<btDeformableFaceNodeContactConstraint*> > m_deformableConstraints;
+    // map from node index to node anchor constraint
+    btHashMap<btHashInt, btDeformableNodeAnchorConstraint> m_nodeAnchorConstraints;
     
     // all constraints involving face
     btAlignedObjectArray<btDeformableContactConstraint*> m_allFaceConstraints;
@@ -58,8 +60,11 @@ public:
     // add friction force to the rhs of the linear solve
     virtual void applyDynamicFriction(TVStack& f);
     
-    // update the constraints
+    // update and solve the constraints
     virtual btScalar update();
+    
+    // solve the position error using split impulse
+    virtual btScalar solveSplitImpulse(const btContactSolverInfo& infoGlobal);
     
     // Add constraints to m_constraints. In addition, the constraints that each vertex own are recorded in m_constraintsDict.
     virtual void setConstraints();
@@ -68,5 +73,7 @@ public:
     virtual void setProjection();
     
     virtual void reinitialize(bool nodeUpdated);
+    
+    virtual void splitImpulseSetup(const btContactSolverInfo& infoGlobal);
 };
 #endif /* btDeformableContactProjection_h */

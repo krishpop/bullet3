@@ -23,7 +23,6 @@ btScalar btDeformableMultiBodyConstraintSolver::solveGroupCacheFriendlyIteration
         ///this is a special step to resolve penetrations (just for contacts)
         solveGroupCacheFriendlySplitImpulseIterations(bodies, numBodies, manifoldPtr, numManifolds, constraints, numConstraints, infoGlobal, debugDrawer);
         
-        m_maxOverrideNumSolverIterations = 50;
         int maxIterations = m_maxOverrideNumSolverIterations > infoGlobal.m_numIterations ? m_maxOverrideNumSolverIterations : infoGlobal.m_numIterations;
         for (int iteration = 0; iteration < maxIterations; iteration++)
         {
@@ -33,10 +32,9 @@ btScalar btDeformableMultiBodyConstraintSolver::solveGroupCacheFriendlyIteration
             m_leastSquaresResidual = solveSingleIteration(iteration, bodies, numBodies, manifoldPtr, numManifolds, constraints, numConstraints, infoGlobal, debugDrawer);
             // solver body velocity -> rigid body velocity
             solverBodyWriteBack(infoGlobal);
-            
+            btScalar deformableResidual = m_deformableSolver->solveContactConstraints();
             // update rigid body velocity in rigid/deformable contact
-            m_leastSquaresResidual = btMax(m_leastSquaresResidual, m_deformableSolver->solveContactConstraints());
-            
+            m_leastSquaresResidual = btMax(m_leastSquaresResidual, deformableResidual);
             // solver body velocity <- rigid body velocity
             writeToSolverBody(bodies, numBodies, infoGlobal);
             
@@ -103,6 +101,43 @@ void btDeformableMultiBodyConstraintSolver::solverBodyWriteBack(const btContactS
         {
             m_tmpSolverBodyPool[i].m_originalBody->setLinearVelocity(m_tmpSolverBodyPool[i].m_linearVelocity + m_tmpSolverBodyPool[i].m_deltaLinearVelocity);
             m_tmpSolverBodyPool[i].m_originalBody->setAngularVelocity(m_tmpSolverBodyPool[i].m_angularVelocity+m_tmpSolverBodyPool[i].m_deltaAngularVelocity);
+        }
+    }
+}
+
+void btDeformableMultiBodyConstraintSolver::solveGroupCacheFriendlySplitImpulseIterations(btCollisionObject** bodies, int numBodies, btPersistentManifold** manifoldPtr, int numManifolds, btTypedConstraint** constraints, int numConstraints, const btContactSolverInfo& infoGlobal, btIDebugDraw* debugDrawer)
+{
+    BT_PROFILE("solveGroupCacheFriendlySplitImpulseIterations");
+    int iteration;
+    if (infoGlobal.m_splitImpulse)
+    {
+        {
+            m_deformableSolver->splitImpulseSetup(infoGlobal);
+            for (iteration = 0; iteration < infoGlobal.m_numIterations; iteration++)
+            {
+                btScalar leastSquaresResidual = 0.f;
+                {
+                    int numPoolConstraints = m_tmpSolverContactConstraintPool.size();
+                    int j;
+                    for (j = 0; j < numPoolConstraints; j++)
+                    {
+                        const btSolverConstraint& solveManifold = m_tmpSolverContactConstraintPool[m_orderTmpConstraintPool[j]];
+                        
+                        btScalar residual = resolveSplitPenetrationImpulse(m_tmpSolverBodyPool[solveManifold.m_solverBodyIdA], m_tmpSolverBodyPool[solveManifold.m_solverBodyIdB], solveManifold);
+                        leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+                    }
+                    // solve the position correction between deformable and rigid/multibody
+                    btScalar residual = m_deformableSolver->solveSplitImpulse(infoGlobal);
+                    leastSquaresResidual = btMax(leastSquaresResidual, residual * residual);
+                }
+                if (leastSquaresResidual <= infoGlobal.m_leastSquaresResidualThreshold || iteration >= (infoGlobal.m_numIterations - 1))
+                {
+#ifdef VERBOSE_RESIDUAL_PRINTF
+                    printf("residual = %f at iteration #%d\n", leastSquaresResidual, iteration);
+#endif
+                    break;
+                }
+            }
         }
     }
 }

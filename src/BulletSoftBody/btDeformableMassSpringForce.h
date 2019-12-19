@@ -23,14 +23,18 @@ class btDeformableMassSpringForce : public btDeformableLagrangianForce
     // If true, the damping force will be in the direction of the spring
     // If false, the damping force will be in the direction of the velocity
     bool m_momentum_conserving;
-    btScalar m_elasticStiffness, m_dampingStiffness;
+    btScalar m_elasticStiffness, m_dampingStiffness, m_bendingStiffness;
 public:
     typedef btAlignedObjectArray<btVector3> TVStack;
     btDeformableMassSpringForce() : m_momentum_conserving(false), m_elasticStiffness(1), m_dampingStiffness(0.05)
     {
     }
-    btDeformableMassSpringForce(btScalar k, btScalar d, bool conserve_angular = true) : m_momentum_conserving(conserve_angular), m_elasticStiffness(k), m_dampingStiffness(d)
+    btDeformableMassSpringForce(btScalar k, btScalar d, bool conserve_angular = true, double bending_k = -1) : m_momentum_conserving(conserve_angular), m_elasticStiffness(k), m_dampingStiffness(d), m_bendingStiffness(bending_k)
     {
+        if (m_bendingStiffness < btScalar(0))
+        {
+            m_bendingStiffness = m_elasticStiffness;
+        }
     }
     
     virtual void addScaledForces(btScalar scale, TVStack& force)
@@ -51,6 +55,10 @@ public:
         for (int i = 0; i < m_softBodies.size(); ++i)
         {
             const btSoftBody* psb = m_softBodies[i];
+            if (!psb->isActive())
+            {
+                continue;
+            }
             for (int j = 0; j < psb->m_links.size(); ++j)
             {
                 const btSoftBody::Link& link = psb->m_links[j];
@@ -83,6 +91,10 @@ public:
         for (int i = 0; i < m_softBodies.size(); ++i)
         {
             const btSoftBody* psb = m_softBodies[i];
+            if (!psb->isActive())
+            {
+                continue;
+            }
             for (int j = 0; j < psb->m_links.size(); ++j)
             {
                 const btSoftBody::Link& link = psb->m_links[j];
@@ -95,7 +107,8 @@ public:
                 // elastic force
                 btVector3 dir = (node2->m_q - node1->m_q);
                 btVector3 dir_normalized = (dir.norm() > SIMD_EPSILON) ? dir.normalized() : btVector3(0,0,0);
-                btVector3 scaled_force = scale * m_elasticStiffness * (dir - dir_normalized * r);
+                btScalar scaled_stiffness = scale * (link.m_bbending ? m_bendingStiffness : m_elasticStiffness);
+                btVector3 scaled_force = scaled_stiffness * (dir - dir_normalized * r);
                 force[id1] += scaled_force;
                 force[id2] -= scaled_force;
             }
@@ -108,6 +121,10 @@ public:
         for (int i = 0; i < m_softBodies.size(); ++i)
         {
             btSoftBody* psb = m_softBodies[i];
+            if (!psb->isActive())
+            {
+                continue;
+            }
             btScalar scaled_k_damp = m_dampingStiffness * scale;
             for (int j = 0; j < psb->m_links.size(); ++j)
             {
@@ -138,6 +155,10 @@ public:
         for (int i = 0; i < m_softBodies.size(); ++i)
         {
             const btSoftBody* psb = m_softBodies[i];
+            if (!psb->isActive())
+            {
+                continue;
+            }
             for (int j = 0; j < psb->m_links.size(); ++j)
             {
                 const btSoftBody::Link& link = psb->m_links[j];
@@ -160,6 +181,10 @@ public:
         for (int i = 0; i < m_softBodies.size(); ++i)
         {
             btSoftBody* psb = m_softBodies[i];
+            if (!psb->isActive())
+            {
+                continue;
+            }
             for (int j = 0; j < psb->m_nodes.size(); ++j)
             {
                 sz = btMax(sz, psb->m_nodes[j].index);
@@ -188,7 +213,10 @@ public:
         for (int i = 0; i < m_softBodies.size(); ++i)
         {
             const btSoftBody* psb = m_softBodies[i];
-            btScalar scaled_k = m_elasticStiffness * scale;
+            if (!psb->isActive())
+            {
+                continue;
+            }
             for (int j = 0; j < psb->m_links.size(); ++j)
             {
                 const btSoftBody::Link& link = psb->m_links[j];
@@ -203,6 +231,7 @@ public:
                 btVector3 dir_normalized = (dir_norm > SIMD_EPSILON) ? dir.normalized() : btVector3(0,0,0);
                 btVector3 dx_diff = dx[id1] - dx[id2];
                 btVector3 scaled_df = btVector3(0,0,0);
+                btScalar scaled_k = scale * (link.m_bbending ? m_bendingStiffness : m_elasticStiffness);
                 if (dir_norm > SIMD_EPSILON)
                 {
                     scaled_df -= scaled_k * dir_normalized.dot(dx_diff) * dir_normalized;
